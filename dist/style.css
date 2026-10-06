@@ -13,3 +13,4 @@
 
 /* Numeric module badges */
 .card-number{font-family:'Segoe UI',system-ui,sans-serif;font-weight:700;font-variant-numeric:tabular-nums}
+.module-cover{display:block;width:100%;height:auto;aspect-ratio:12/7;object-fit:contain;border-radius:12px;margin:0 0 20px;background:#f2f4ec}
