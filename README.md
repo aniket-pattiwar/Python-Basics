@@ -20,6 +20,12 @@ Prepared example results are labeled. The site does not run Python. Run the exam
 
 ## Local development
 
+Interactive learning is in `dist/interactive.js`. All 14 lessons include output-prediction checks, Q&A flashcards, focus reading, and browser-local notes. The learning path includes resume links, completion milestones, and shortcuts to practice. MCQ exam mode shuffles up to 20 questions from the selected set/topic, keeps practice answers hidden during the exam, and reviews scores and explanations at the end. Exam results do not overwrite practice scores.
+
+The Data Playground (`#datalab`) includes editable matrix reductions by axis, grouped receipt totals/averages with bar/line charts, and string-slicing sliders. These are JavaScript teaching simulations with matching Python code; no Python runtime or chart library is downloaded. Coding exercises include saved scratchpad attempts and `.py` downloads. Notes, attempts, activity wins and existing course progress stay on this browser. Explicit save buttons report storage failures.
+
+Browser verification covered all 14 lessons (28 prediction forms), correct prediction feedback, flashcard reveal, note persistence after reload, saved attempts after filtering, a complete topic exam and its review, live array sums, chart aggregation/style changes, invalid input recovery, and the 390px phone layout without horizontal overflow. Existing MCQ and coding-bank validation also passed.
+
 With Node.js installed, run `node server.mjs` from this directory, then open http://127.0.0.1:4173. Stop with Ctrl+C. Static output is in `dist`. Content is in `dist/course.js`; interactions are in `dist/app.js`; styles are in `dist/style.css`.
 
 ## Verification

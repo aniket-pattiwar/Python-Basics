@@ -246,6 +246,7 @@ function route(){
   const title=hash.startsWith('lesson/')?COURSE.find(m=>m.id===hash.split('/')[1])?.title:({curriculum:'Learning path',mcq:'MCQ Practice',coding:'Coding Practice',playground:'Try an example',resources:'Books & resources'})[hash];
   document.title=(title||'Learn by doing')+' · Python Everyday';
   updateProgress();window.scrollTo(0,0);
+  if(typeof enhanceLearning==='function')enhanceLearning(hash);
 }
 window.addEventListener('hashchange',()=>{route();main.focus({preventScroll:true});});
 route();
