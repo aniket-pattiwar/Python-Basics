@@ -1,4 +1,4 @@
-/* Original, standalone easy-to-medium exercises. Verify solutions with check-coding.py. */
+/* Original, standalone exercises at easy, medium and hard levels. */
 const CODING_BANK = (()=>{
   const numpy='import numpy as np\n';
   const pandas='import pandas as pd\n';
@@ -141,6 +141,227 @@ const CODING_BANK = (()=>{
       '[120.0, 80.0, 125.0]\nSaved store-targets.svg',
       'Validate positive targets before division. np.where() creates colors from the percentage condition. ax.axhline() adds the reference line.',
       'assert df["achievement"].tolist() == [120, 80, 125]\nassert len(ax.patches) == 3\nassert list(ax.lines[0].get_ydata()) == [100, 100]',
-      {file:'store-targets.svg',description:'North 120% and West 125% appear green; South 80% appears amber. A dashed line marks the 100% target.'})
+      {file:'store-targets.svg',description:'North 120% and West 125% appear green; South 80% appears amber. A dashed line marks the 100% target.'}),
+    exercise('hard-np-rolling','NumPy','Hard','Calculate reliable rolling sensor means','Write a function that computes three-reading rolling means for each sensor using vectorized window reductions. Ignore NaN readings, but require at least two valid readings per window. Return NaN for insufficient data and display it as None. Validate the window and minimum-valid count; do not modify the input.',
+      numpy+'readings = np.array([[10, np.nan, 14, 16, 18, 20],\n                     [np.nan, np.nan, 30, 36, 42, np.nan]])',
+      `def rolling_means(data, window=3, min_valid=2):
+    data = np.asarray(data, dtype=float)
+    if not isinstance(window, (int, np.integer)) or not isinstance(min_valid, (int, np.integer)):
+        raise ValueError("Window and min_valid must be integers")
+    if data.ndim != 2 or not 1 <= window <= data.shape[1]:
+        raise ValueError("Expected a 2-D array and a valid window")
+    if not 1 <= min_valid <= window:
+        raise ValueError("min_valid must be between 1 and window")
+    windows = np.lib.stride_tricks.sliding_window_view(data, window, axis=1)
+    counts = np.sum(~np.isnan(windows), axis=-1)
+    totals = np.nansum(windows, axis=-1)
+    return np.divide(totals, counts, out=np.full(totals.shape, np.nan),
+                     where=counts >= min_valid)
+
+averages = rolling_means(readings)
+display = [[None if np.isnan(v) else round(float(v), 2) for v in row]
+           for row in averages]
+print(display)`,
+      '[[12.0, 15.0, 16.0, 18.0], [None, 33.0, 36.0, 39.0]]',
+      'sliding_window_view(..., axis=1) adds the window axis at the end. Reduce that last axis and use np.divide(out=..., where=...) to avoid invalid division. For these inputs, NaN is the only missing-value marker.',
+      'np.testing.assert_allclose(averages, [[12, 15, 16, 18], [np.nan, 33, 36, 39]], equal_nan=True)\nassert np.isnan(rolling_means([[np.nan, np.nan, np.nan]])).all()\nassert np.isnan(readings[0, 1])'),
+    exercise('hard-np-neighbors','NumPy','Hard','Find nearest neighbors with broadcasting','For each point, find the indices of its two nearest other points using squared Euclidean distance. Exclude only the same row, so distinct rows with identical coordinates remain valid neighbors. Break distance ties by the smaller row index. Validate finite coordinates and k between 1 and n−1, and print neighbor names.',
+      numpy+'points = np.array([[0, 0], [1, 0], [0, 2], [3, 0]], dtype=float)\nnames = np.array(["A", "B", "C", "D"])',
+      `def nearest_indices(points, k):
+    points = np.asarray(points, dtype=float)
+    if points.ndim != 2 or len(points) < 2 or points.shape[1] == 0:
+        raise ValueError("Need at least two rows of coordinates")
+    if not np.isfinite(points).all() or not isinstance(k, (int, np.integer)) or not 1 <= k < len(points):
+        raise ValueError("Need finite coordinates and 1 <= k < n")
+    differences = points[:, None, :] - points[None, :, :]
+    distances = np.sum(differences ** 2, axis=-1)
+    np.fill_diagonal(distances, np.inf)
+    return np.argsort(distances, axis=1, kind="stable")[:, :k]
+
+indices = nearest_indices(points, 2)
+print(names[indices].tolist())`,
+      "[['B', 'C'], ['A', 'D'], ['A', 'B'], ['B', 'A']]",
+      'Broadcast an (n,1,d) array against a (1,n,d) array. Mask the diagonal with infinity and use stable sorting. This builds an n×n distance matrix, so it is a small-dataset teaching approach.',
+      'np.testing.assert_array_equal(indices, [[1, 2], [0, 3], [0, 1], [1, 0]])\nassert nearest_indices([[0, 0], [0, 0], [1, 0]], 1).tolist() == [[1], [0], [0]]'),
+    exercise('hard-pd-asof','Pandas','Hard','Match orders to historical prices','Attach the most recent price at or before each order time for the same product. Reject duplicate product/price-time records. Do not use prices older than three days, and keep orders with no eligible price. Calculate revenue, restore order_id order, and display missing price/revenue values as None.',
+      pandas+'prices = pd.DataFrame({"product": ["A", "A", "B"],\n    "price_time": ["2026-08-01", "2026-08-03", "2026-08-02"], "price": [100, 120, 50]})\norders = pd.DataFrame({"order_id": [11, 12, 13, 14], "product": ["A", "A", "B", "C"],\n    "order_time": ["2026-08-02", "2026-08-04", "2026-08-04", "2026-08-04"],\n    "quantity": [2, 1, 3, 1]})',
+      `def attach_prices(orders, prices):
+    orders, prices = orders.copy(), prices.copy()
+    orders["order_time"] = pd.to_datetime(orders["order_time"])
+    prices["price_time"] = pd.to_datetime(prices["price_time"])
+    if prices.duplicated(["product", "price_time"]).any():
+        raise ValueError("Duplicate product/price-time records")
+    matched = pd.merge_asof(
+        orders.sort_values("order_time"), prices.sort_values("price_time"),
+        left_on="order_time", right_on="price_time", by="product",
+        direction="backward", tolerance=pd.Timedelta(days=3)
+    )
+    matched["revenue"] = matched["price"] * matched["quantity"]
+    return matched.sort_values("order_id")
+
+matched = attach_prices(orders, prices)
+result = matched[["order_id", "price", "revenue"]].astype(object)
+print(result.where(pd.notna(result), None).to_dict("records"))`,
+      "[{'order_id': 11, 'price': 100.0, 'revenue': 200.0}, {'order_id': 12, 'price': 120.0, 'revenue': 120.0}, {'order_id': 13, 'price': 50.0, 'revenue': 150.0}, {'order_id': 14, 'price': None, 'revenue': None}]",
+      'merge_asof requires both tables to be globally sorted by their time keys. Use by="product", direction="backward" and a Timedelta tolerance. A standard merge cannot implement this time-based rule.',
+      'assert matched["order_id"].tolist() == [11, 12, 13, 14]\nassert matched["revenue"].iloc[:3].tolist() == [200, 120, 150]\nassert pd.isna(matched["price"].iloc[3])\nold_order = orders.iloc[[0]].copy()\nold_order["order_time"] = "2026-08-10"\nassert attach_prices(old_order, prices)["price"].isna().all()'),
+    exercise('hard-pd-calendar','Pandas','Hard','Complete a calendar before rolling averages','Build every product/date combination from August 1–4, 2026. Aggregate same-day sales and fill absent combinations with zero. Calculate a three-day rolling mean independently per product, requiring a full window. Sort by product/date and print the sales and rounded mean lists; show incomplete windows as None.',
+      pandas+'df = pd.DataFrame({"product": ["A", "A", "B", "B"],\n    "date": ["2026-08-01", "2026-08-03", "2026-08-02", "2026-08-04"],\n    "sales": [10, 30, 20, 40]})',
+      `df["date"] = pd.to_datetime(df["date"])
+calendar = pd.date_range("2026-08-01", "2026-08-04")
+grid = pd.MultiIndex.from_product([sorted(df["product"].unique()), calendar],
+                                  names=["product", "date"])
+daily = df.groupby(["product", "date"])["sales"].sum().reindex(grid, fill_value=0)
+daily = daily.rename("sales").reset_index()
+daily["rolling_mean"] = daily.groupby("product")["sales"].transform(
+    lambda values: values.rolling(3, min_periods=3).mean()
+).round(2)
+means = daily["rolling_mean"].astype(object)
+print(daily["sales"].tolist())
+print(means.where(pd.notna(means), None).tolist())`,
+      '[10, 0, 30, 0, 0, 20, 0, 40]\n[None, None, 13.33, 10.0, None, None, 6.67, 20.0]',
+      'Reindex onto a complete MultiIndex before rolling. Otherwise three observations can span more than three calendar days. groupby().transform() aligns each result to its original row.',
+      'assert len(daily) == 8\nassert daily["sales"].sum() == 100\nassert daily.groupby("product")["rolling_mean"].apply(lambda x: x.isna().sum()).tolist() == [2, 2]'),
+    exercise('hard-mpl-stacked','Matplotlib','Hard','Compare quarterly revenue shares','Build a 100% stacked bar chart for Tea and Coffee in three quarters. Convert revenue to percentages, reject zero or negative quarter totals, label both segments with one decimal place, use a 0–100% vertical axis and add a legend. Print both percentage lists and save quarterly-shares.svg.',
+      matplotlib+'from matplotlib.ticker import PercentFormatter\nquarters = ["Q1", "Q2", "Q3"]\ntea = [120, 180, 150]\ncoffee = [180, 120, 250]',
+      `totals = [a + b for a, b in zip(tea, coffee)]
+if any(total <= 0 for total in totals):
+    raise ValueError("Quarter totals must be positive")
+tea_pct = [a / total * 100 for a, total in zip(tea, totals)]
+coffee_pct = [b / total * 100 for b, total in zip(coffee, totals)]
+print(tea_pct)
+print(coffee_pct)
+fig, ax = plt.subplots(figsize=(6, 3.5))
+tea_bars = ax.bar(quarters, tea_pct, label="Tea", color="#21534a")
+coffee_bars = ax.bar(quarters, coffee_pct, bottom=tea_pct,
+                     label="Coffee", color="#d7e7ab")
+ax.bar_label(tea_bars, labels=[f"{v:.1f}%" for v in tea_pct],
+             label_type="center", color="white")
+ax.bar_label(coffee_bars, labels=[f"{v:.1f}%" for v in coffee_pct], label_type="center")
+ax.set(xlabel="Quarter", ylabel="Revenue share", title="Quarterly product mix", ylim=(0, 100))
+ax.yaxis.set_major_formatter(PercentFormatter(100))
+ax.legend(loc="upper left", bbox_to_anchor=(1, 1))`+finish('quarterly-shares.svg'),
+      '[40.0, 60.0, 37.5]\n[60.0, 40.0, 62.5]\nSaved quarterly-shares.svg',
+      'Each quarter is its own denominator. The second bar series needs bottom=tea_pct. bar_label(label_type="center") positions labels inside each segment.',
+      'np.testing.assert_allclose(np.array(tea_pct) + coffee_pct, [100, 100, 100])\nassert len(ax.patches) == 6\nassert len(ax.texts) == 6\nassert ax.get_ylim() == (0, 100)',
+      {file:'quarterly-shares.svg',description:'Three bars each total 100%. Tea shares are 40%, 60%, 37.5%; Coffee shares are 60%, 40%, 62.5%, with labels inside the segments.'}),
+    exercise('hard-mpl-heatmaps','Matplotlib','Hard','Use a shared scale for two heatmaps','Plot Before and After team scores side by side. Annotate every cell, label rows and columns, and use the same 0–100 color scale with one shared colorbar. Use constrained layout so the colorbar does not overlap the charts. Save team-score-heatmaps.svg.',
+      matplotlib+'teams = ["Support", "Sales", "Ops"]\nmetrics = ["Speed", "Quality", "Coverage"]\nbefore = [[70, 65, 80], [80, 75, 60], [60, 70, 75]]\nafter = [[80, 75, 90], [85, 80, 70], [70, 75, 85]]',
+      `fig, axes = plt.subplots(1, 2, figsize=(9, 4), layout="constrained")
+for ax, matrix, title in zip(axes, [before, after], ["Before", "After"]):
+    image = ax.imshow(matrix, vmin=0, vmax=100, cmap="viridis")
+    ax.set_xticks(range(len(metrics)), labels=metrics)
+    ax.set_yticks(range(len(teams)), labels=teams)
+    ax.set_title(title)
+    for row in range(len(teams)):
+        for col in range(len(metrics)):
+            value = matrix[row][col]
+            ax.text(col, row, str(value), ha="center", va="center",
+                    color="white" if value < 60 else "black")
+fig.colorbar(image, ax=axes.tolist(), label="Score (0–100)")
+fig.savefig("team-score-heatmaps.svg")
+plt.close(fig)
+print("Saved team-score-heatmaps.svg")`,
+      'Saved team-score-heatmaps.svg',
+      'Set identical vmin and vmax on both images. Pass both Axes to fig.colorbar(). Annotate using column as x and row as y; do not call tight_layout() after choosing constrained layout.',
+      'assert len(fig.axes) == 3\nassert all(ax.images[0].get_clim() == (0, 100) for ax in axes)\nassert all(len(ax.texts) == 9 for ax in axes)\nnp.testing.assert_array_equal(axes[1].images[0].get_array(), after)',
+      {file:'team-score-heatmaps.svg',description:'Two annotated 3×3 heatmaps, Before and After, share one colorbar spanning 0–100 so the same score has the same color in both panels.'}),
+    exercise('hard-mix-outliers','NumPy + Pandas','Hard','Detect outliers within each region','Calculate Q1, Q3 and IQR separately for each region with Pandas. Use NumPy to flag values outside Q1−1.5×IQR through Q3+1.5×IQR. For a zero-IQR group, flag any value different from its median. Print flagged row indices and outlier counts per region.',
+      numpy+pandas+'df = pd.DataFrame({"region": ["East"] * 5 + ["West"] * 5,\n    "sales": [10, 11, 12, 13, 100, 20, 20, 20, 20, 50]})',
+      `def flag_outliers(data):
+    data = data.copy()
+    groups = data.groupby("region")["sales"]
+    q1 = groups.transform(lambda values: values.quantile(0.25)).to_numpy()
+    q3 = groups.transform(lambda values: values.quantile(0.75)).to_numpy()
+    medians = groups.transform("median").to_numpy()
+    values = data["sales"].to_numpy()
+    iqr = q3 - q1
+    outside = (values < q1 - 1.5 * iqr) | (values > q3 + 1.5 * iqr)
+    data["outlier"] = np.where(iqr == 0, values != medians, outside)
+    return data
+
+flagged = flag_outliers(df)
+print(flagged.index[flagged["outlier"]].tolist())
+print(flagged.groupby("region")["outlier"].sum().to_dict())`,
+      "[4, 9]\n{'East': 1, 'West': 1}",
+      'transform broadcasts group statistics back to rows. Use strict < and > comparisons; points exactly at a boundary are included. The finite sample values need no missing-value policy.',
+      'assert flagged.index[flagged["outlier"]].tolist() == [4, 9]\nconstant = pd.DataFrame({"region": ["X"] * 3, "sales": [7, 7, 7]})\nassert not flag_outliers(constant)["outlier"].any()'),
+    exercise('hard-mix-standardize','NumPy + Pandas','Hard','Standardize features without data leakage','Fit population means and standard deviations using training rows only. Apply them to validation rows using the specified feature order, even though validation columns arrive in a different order. Use scale 1 for a constant training feature and preserve the validation index. Print transformed values rounded to two decimals and their index.',
+      numpy+pandas+'features = ["age", "spend", "constant"]\ntrain = pd.DataFrame({"age": [20, 30, 40], "spend": [100, 200, 300], "constant": [1, 1, 1]})\nvalidation = pd.DataFrame({"spend": [400, 100], "constant": [1, 2], "age": [50, 20]}, index=[101, 105])',
+      `def standardize(train, validation, features):
+    values = train.loc[:, features].to_numpy(dtype=float)
+    test_values = validation.loc[:, features].to_numpy(dtype=float)
+    if len(values) == 0 or not np.isfinite(values).all() or not np.isfinite(test_values).all():
+        raise ValueError("Need nonempty finite training data and finite validation values")
+    means = values.mean(axis=0)
+    std = values.std(axis=0, ddof=0)
+    scales = np.where(std == 0, 1, std)
+    transformed = (test_values - means) / scales
+    result = pd.DataFrame(transformed, columns=features, index=validation.index)
+    return result, means, scales
+
+result, means, scales = standardize(train, validation, features)
+print(result.round(2).values.tolist())
+print(result.index.tolist())`,
+      '[[2.45, 2.45, 0.0], [-1.22, -1.22, 1.0]]\n[101, 105]',
+      'Select both tables with .loc[:, features] before converting to arrays. Learn statistics only from train; validation data must not influence preprocessing parameters.',
+      'np.testing.assert_allclose(means, [30, 200, 1])\nassert result.index.tolist() == [101, 105]\nassert result.columns.tolist() == features\nassert scales[2] == 1\n_, changed_means, changed_scales = standardize(train, validation * 10, features)\nnp.testing.assert_allclose(changed_means, means)\nnp.testing.assert_allclose(changed_scales, scales)'),
+    exercise('hard-all-revenue','NumPy + Pandas + Matplotlib','Hard','Clean and chart a daily revenue pipeline','Parse dates and reject invalid dates. Convert sales to numbers and use NumPy to replace nonfinite or negative amounts with zero. Aggregate duplicate dates and create the full daily calendar. Calculate a full-window three-day moving mean. Print the audit counts and values, then plot daily bars with a rolling-mean line and save revenue-pipeline.svg.',
+      numpy+pandas+matplotlib+'raw = pd.DataFrame({"date": ["2026-08-01", "2026-08-01", "2026-08-03",\n    "2026-08-04", "2026-08-06", "not-a-date"],\n    "sales": ["100", "50", "bad", "-20", "200", "999"]})',
+      `raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
+rejected_dates = int(raw["date"].isna().sum())
+clean = raw.dropna(subset=["date"]).copy()
+values = pd.to_numeric(clean["sales"], errors="coerce").to_numpy(dtype=float)
+invalid = ~np.isfinite(values) | (values < 0)
+clean["sales"] = np.where(invalid, 0, values)
+daily = clean.set_index("date")["sales"].resample("D").sum()
+rolling = daily.rolling(3, min_periods=3).mean()
+print(f"Rejected dates: {rejected_dates}")
+print(f"Repaired sales: {int(invalid.sum())}")
+print(daily.tolist())
+display = [None if pd.isna(v) else round(float(v), 2) for v in rolling]
+print(display)
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.bar(daily.index, daily.values, width=0.7, label="Daily revenue", color="#d7e7ab")
+ax.plot(rolling.index, rolling.values, marker="o", label="3-day mean", color="#21534a")
+ax.set(xlabel="Date", ylabel="Revenue (INR)", title="Cleaned daily revenue")
+ax.legend()
+fig.autofmt_xdate()`+finish('revenue-pipeline.svg'),
+      'Rejected dates: 1\nRepaired sales: 2\n[150.0, 0.0, 0.0, 0.0, 0.0, 200.0]\n[None, None, 50.0, 0.0, 0.0, 66.67]\nSaved revenue-pipeline.svg',
+      'Audit dropped dates separately from repaired sales. resample("D").sum() both combines repeated days and fills empty days with zero here. Compute rolling values after creating the calendar. These replacement rules are exercise choices, not a universal cleaning policy.',
+      'assert rejected_dates == 1 and invalid.sum() == 2\nassert daily.sum() == 350 and len(daily) == 6\nnp.testing.assert_allclose(rolling.iloc[2:], [50, 0, 0, 200/3])\nassert len(ax.patches) == 6 and len(ax.lines) == 1',
+      {file:'revenue-pipeline.svg',description:'Daily bars cover August 1–6: 150, 0, 0, 0, 0, 200. A three-day mean starts on August 3 at 50 and ends at approximately 66.67.'}),
+    exercise('hard-all-correlation','NumPy + Pandas + Matplotlib','Hard','Build a correlation heatmap safely','Select numeric columns, treat nonfinite values as missing and drop incomplete rows. Remove constant columns, then validate that at least two rows and two variable columns remain. Compute Pearson correlation with NumPy, label it with Pandas, and plot an annotated heatmap with a fixed −1 to 1 scale. Report used rows and excluded constant columns; save feature-correlation.svg.',
+      numpy+pandas+matplotlib+'df = pd.DataFrame({"store": ["A", "B", "C", "D", "E"],\n    "ad_spend": [10, 20, 30, 40, 50], "sales": [100, 200, 150, 300, np.nan],\n    "constant": [5, 5, 5, 5, 5]})',
+      `def feature_correlation(data):
+    numeric = data.select_dtypes(include="number").replace([np.inf, -np.inf], np.nan).dropna()
+    if len(numeric) < 2:
+        raise ValueError("Need at least two complete rows")
+    values = numeric.to_numpy(dtype=float)
+    variable = np.ptp(values, axis=0) > 0
+    excluded = numeric.columns[~variable].tolist()
+    labels = numeric.columns[variable]
+    if len(labels) < 2:
+        raise ValueError("Need at least two variable numeric columns")
+    matrix = np.corrcoef(values[:, variable], rowvar=False)
+    return pd.DataFrame(matrix, index=labels, columns=labels), len(numeric), excluded
+
+corr, used_rows, excluded = feature_correlation(df)
+print(f"Used rows: {used_rows}")
+print(f"Excluded constants: {excluded}")
+print(corr.round(3).values.tolist())
+fig, ax = plt.subplots(figsize=(5.5, 4))
+image = ax.imshow(corr.values, cmap="RdBu_r", vmin=-1, vmax=1)
+ax.set_xticks(range(len(corr)), labels=corr.columns)
+ax.set_yticks(range(len(corr)), labels=corr.index)
+for row in range(len(corr)):
+    for col in range(len(corr)):
+        ax.text(col, row, f"{corr.iloc[row, col]:.2f}", ha="center", va="center", color="white")
+ax.set_title("Feature correlation")
+fig.colorbar(image, ax=ax, label="Pearson r")`+finish('feature-correlation.svg'),
+      "Used rows: 4\nExcluded constants: ['constant']\n[[1.0, 0.832], [0.832, 1.0]]\nSaved feature-correlation.svg",
+      'Keep labels when converting arrays back to a table. Use rowvar=False because rows are observations. Constant features have undefined correlation; remove them before computation. Correlation shows association, not causation.',
+      'assert used_rows == 4 and excluded == ["constant"]\nassert corr.columns.tolist() == ["ad_spend", "sales"]\nnp.testing.assert_allclose(corr.values, corr.values.T)\nnp.testing.assert_allclose(np.diag(corr), [1, 1])\nassert image.get_clim() == (-1, 1)',
+      {file:'feature-correlation.svg',description:'A labeled 2×2 heatmap with diagonal values 1.00 and ad_spend/sales correlation approximately 0.83. The constant column and incomplete fifth row are excluded.'})
   ];
 })();
