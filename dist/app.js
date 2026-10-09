@@ -123,12 +123,79 @@ function resources(){
   const books=[['Data Wrangling with Python','Jacqueline Kazil & Katharine Jarmul'],['Introduction to Computer Science Using Python','Charles · Wiley (as listed in the syllabus)'],['Learn Python the Hard Way','Zed A. Shaw · Pearson · 2018'],['Python Crash Course','A Hands-On, Project-Based Introduction to Programming'],['Python Cookbook','David Beazley & Brian K. Jones · O’Reilly / Shroff'],['Head First Python','Paul Barry · O’Reilly / Shroff'],['Beginning Programming with Python For Dummies','John Paul Mueller · Wiley']];
   main.innerHTML=`<div class="page-intro"><div class="eyebrow">A GOOD BOOK. A USEFUL REFERENCE.</div><h1>Keep a little help nearby.</h1><p>Your supplied course reading list, plus official documentation for going deeper. The website’s notes and examples are original learning aids; they do not reproduce these books.</p></div><div class="resource-grid"><section class="resource"><div class="eyebrow">PRIMARY COURSEWARE</div><h2>Python for Everybody</h2><p><strong>Exploring Data in Python 3</strong><br>Charles R. Severance<br>Shroff Publishers & Distributors</p><a class="button secondary" href="https://www.py4e.com/book" target="_blank" rel="noopener">Author’s book page ↗</a><p class="legend-note" style="margin-top:18px">Read a little, type the examples, then change one thing. Understanding grows through experiments.</p></section><section class="resource"><div class="eyebrow">OFFICIAL DOCUMENTATION</div><h3>Go to the source</h3><div class="resource-links"><a href="https://www.python.org/downloads/" target="_blank" rel="noopener">Install Python ↗</a><a href="https://docs.python.org/3/tutorial/" target="_blank" rel="noopener">Python tutorial ↗</a><a href="https://numpy.org/doc/stable/user/absolute_beginners.html" target="_blank" rel="noopener">NumPy beginner’s guide ↗</a><a href="https://pandas.pydata.org/docs/getting_started/" target="_blank" rel="noopener">Pandas getting started ↗</a><a href="https://docs.scipy.org/doc/scipy/tutorial/" target="_blank" rel="noopener">SciPy tutorials ↗</a><a href="https://matplotlib.org/stable/tutorials/index.html" target="_blank" rel="noopener">Matplotlib tutorials ↗</a><a href="https://seaborn.pydata.org/tutorial.html" target="_blank" rel="noopener">Seaborn tutorial ↗</a><a href="https://plotly.com/python/" target="_blank" rel="noopener">Plotly for Python ↗</a><a href="https://plotnine.org/" target="_blank" rel="noopener">plotnine: ggplot-style graphics ↗</a><a href="https://flask.palletsprojects.com/en/stable/quickstart/" target="_blank" rel="noopener">Flask quickstart ↗</a><a href="https://docs.djangoproject.com/en/stable/intro/" target="_blank" rel="noopener">Django introduction ↗</a><a href="https://requests.readthedocs.io/en/latest/user/quickstart/" target="_blank" rel="noopener">Requests quickstart ↗</a><a href="https://docs.scrapy.org/en/latest/intro/tutorial.html" target="_blank" rel="noopener">Scrapy tutorial ↗</a></div></section><section class="resource" style="grid-column:1/-1"><div class="eyebrow">REFERENCE BOOKS · FROM YOUR SYLLABUS</div><ul class="book-list">${books.map(book=>`<li><strong>${book[0]}</strong><span>${book[1]}</span></li>`).join('')}</ul></section></div><section class="course-info"><p><strong>A manageable practice routine</strong></p><p>Read one concept. Predict an example’s result before revealing it. Type the code yourself, change the inputs, and explain what happened. Save each lab in a clearly named folder.</p><p>For the six self-learning hours, use the prompts in modules 10–14. Keep notes on data sources, experiment timing, chart choices, database integrity, web services, and responsible collection.</p></section>`;
 }
+const mcqAnswers = new Map();
+let mcqStorageAvailable = true;
+try {
+  const saved = JSON.parse(localStorage.getItem('python-everyday-mcq-v1') || '{}');
+  if(saved && typeof saved === 'object' && !Array.isArray(saved)) {
+    for(const [id,answer] of Object.entries(saved)) {
+      const question=MCQ_BANK.find(q=>q.id===id);
+      if(question && Number.isInteger(answer) && answer>=0 && answer<question.options.length) mcqAnswers.set(id,answer);
+    }
+  }
+} catch { mcqStorageAvailable=false; }
+const mcqView={group:'syllabus',topic:'All topics',position:0};
+function mcqPractice(){
+  const groups=[['syllabus','Full syllabus · 50'],['specialist','NumPy, Pandas & Matplotlib · 50'],['all','All questions · 100']];
+  main.innerHTML=`<div class="page-intro"><div class="eyebrow">THINK IT THROUGH. THEN CHECK.</div><h1>100 unique MCQs</h1><p>50 questions across all 14 course modules, plus 50 focused on NumPy, Pandas and Matplotlib. Choose an answer, check the explanation, and build your confidence one question at a time.</p></div><div class="mcq-sets" role="group" aria-label="Choose a question set">${groups.map(([value,label])=>`<button class="filter ${value===mcqView.group?'active':''}" data-mcq-group="${value}" aria-pressed="${value===mcqView.group}">${label}</button>`).join('')}</div><div class="mcq-tools"><label>Topic<select id="mcq-topic"></select></label><label>Jump to question<select id="mcq-jump"></select></label></div><div id="mcq-score" class="mcq-score" role="status"></div><div id="mcq-question"></div><p class="continue-note" id="mcq-storage"></p><details class="mcq-references"><summary>Go deeper with official documentation</summary><p><a href="https://docs.python.org/3/tutorial/" target="_blank" rel="noopener">Python tutorial ↗</a> · <a href="https://numpy.org/doc/stable/user/absolute_beginners.html" target="_blank" rel="noopener">NumPy ↗</a> · <a href="https://pandas.pydata.org/docs/getting_started/intro_tutorials/index.html" target="_blank" rel="noopener">Pandas ↗</a> · <a href="https://matplotlib.org/stable/users/explain/quick_start.html" target="_blank" rel="noopener">Matplotlib ↗</a></p></details>`;
+  let filtered=[];
+  const topicSelect=document.getElementById('mcq-topic');
+  const jumpSelect=document.getElementById('mcq-jump');
+  const panel=document.getElementById('mcq-question');
+  function persist(){
+    try{localStorage.setItem('python-everyday-mcq-v1',JSON.stringify(Object.fromEntries(mcqAnswers)));}
+    catch{mcqStorageAvailable=false;}
+  }
+  function updateSet(){
+    const pool=MCQ_BANK.filter(q=>mcqView.group==='all'||q.group===mcqView.group);
+    const topics=['All topics',...new Set(pool.map(q=>q.topic))];
+    if(!topics.includes(mcqView.topic))mcqView.topic='All topics';
+    topicSelect.innerHTML=topics.map(topic=>`<option ${topic===mcqView.topic?'selected':''}>${escapeHTML(topic)}</option>`).join('');
+    filtered=pool.filter(q=>mcqView.topic==='All topics'||q.topic===mcqView.topic);
+    mcqView.position=Math.min(mcqView.position,filtered.length-1);
+    jumpSelect.innerHTML=filtered.map((q,index)=>`<option value="${index}">${index+1} · ${escapeHTML(q.topic)}</option>`).join('');
+    renderQuestion();
+  }
+  function renderQuestion(focus=false){
+    const q=filtered[mcqView.position];
+    const answered=mcqAnswers.has(q.id);
+    const chosen=mcqAnswers.get(q.id);
+    const correct=answered&&chosen===q.answer;
+    const attempted=filtered.filter(item=>mcqAnswers.has(item.id)).length;
+    const points=filtered.filter(item=>mcqAnswers.has(item.id)&&mcqAnswers.get(item.id)===item.answer).length;
+    jumpSelect.value=String(mcqView.position);
+    document.getElementById('mcq-score').innerHTML=`<span><strong>${attempted} / ${filtered.length}</strong> answered in this selection</span><span><strong>${points} / ${attempted}</strong> correct</span><progress max="${filtered.length}" value="${attempted}" aria-label="Questions answered in this selection"></progress>${attempted===filtered.length?'<span class="mcq-finished">Selection complete. Revisit any answer or choose another set.</span>':''}`;
+    document.getElementById('mcq-storage').textContent=mcqStorageAvailable?'Checked answers are saved on this browser. Each question counts once; Try again replaces its previous result.':'Browser storage is unavailable. Checked answers last for this visit.';
+    panel.innerHTML=`<section class="mcq-card"><div class="mcq-meta"><span class="eyebrow">QUESTION ${mcqView.position+1} OF ${filtered.length}</span><span class="pill">${escapeHTML(q.topic)}</span></div><form id="mcq-form"><fieldset><legend id="mcq-heading" tabindex="-1">${escapeHTML(q.question)}</legend><div class="mcq-options">${q.options.map((option,index)=>`<label class="quiz-option mcq-option ${answered&&index===q.answer?'mcq-correct':''} ${answered&&index===chosen&&index!==q.answer?'mcq-wrong':''}"><input type="radio" name="mcq-answer" value="${index}" ${answered?'disabled':''} ${chosen===index?'checked':''} required><span><b>${String.fromCharCode(65+index)}.</b> ${escapeHTML(option)}${answered&&index===q.answer?'<small>Correct answer</small>':''}${answered&&index===chosen&&index!==q.answer?'<small>Your answer</small>':''}</span></label>`).join('')}</div></fieldset>${answered?'<button class="button secondary" type="button" id="mcq-retry">Try again</button>':'<button class="button" type="submit">Check answer</button>'}<div id="mcq-feedback" aria-live="polite" tabindex="-1">${answered?`<div class="feedback ${correct?'':'wrong'}"><strong>${correct?'Correct!':'Not quite.'}</strong> ${correct?'':`The correct answer is ${String.fromCharCode(65+q.answer)}: ${escapeHTML(q.options[q.answer])}. `}<p>${escapeHTML(q.explanation)}</p></div>`:''}</div></form><div class="mcq-navigation"><button class="button secondary" id="mcq-prev" ${mcqView.position===0?'disabled':''}>← Previous</button><span>${mcqView.position+1} / ${filtered.length}</span><button class="button secondary" id="mcq-next" ${mcqView.position===filtered.length-1?'disabled':''}>Next →</button></div></section>`;
+    document.getElementById('mcq-form').addEventListener('submit',event=>{
+      event.preventDefault();
+      const selection=new FormData(event.currentTarget).get('mcq-answer');
+      if(selection===null)return;
+      mcqAnswers.set(q.id,Number(selection));persist();renderQuestion();
+      document.getElementById('mcq-feedback').focus({preventScroll:true});
+    });
+    document.getElementById('mcq-retry')?.addEventListener('click',()=>{
+      mcqAnswers.delete(q.id);persist();renderQuestion(true);
+    });
+    document.getElementById('mcq-prev').addEventListener('click',()=>{mcqView.position--;renderQuestion(true);});
+    document.getElementById('mcq-next').addEventListener('click',()=>{mcqView.position++;renderQuestion(true);});
+    if(focus)document.getElementById('mcq-heading').focus({preventScroll:true});
+  }
+  document.querySelectorAll('[data-mcq-group]').forEach(button=>button.addEventListener('click',()=>{
+    mcqView.group=button.dataset.mcqGroup;mcqView.topic='All topics';mcqView.position=0;
+    document.querySelectorAll('[data-mcq-group]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});
+    updateSet();
+  }));
+  topicSelect.addEventListener('change',()=>{mcqView.topic=topicSelect.value;mcqView.position=0;updateSet();});
+  jumpSelect.addEventListener('change',()=>{mcqView.position=Number(jumpSelect.value);renderQuestion(true);});
+  updateSet();
+}
 function route(){
   const requested=location.hash.slice(1);
-  const hash=requested.startsWith('lesson/')||['curriculum','playground','resources'].includes(requested)?requested:'curriculum';
+  const hash=requested.startsWith('lesson/')||['curriculum','mcq','playground','resources'].includes(requested)?requested:'curriculum';
   document.querySelectorAll('[data-nav]').forEach(a=>{const active=hash===a.dataset.nav||(hash.startsWith('lesson/')&&a.dataset.nav==='curriculum');a.classList.toggle('active',active);if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
-  if(hash.startsWith('lesson/'))lesson(hash.split('/')[1]);else if(hash==='playground')playground();else if(hash==='resources')resources();else curriculum();
-  const title=hash.startsWith('lesson/')?COURSE.find(m=>m.id===hash.split('/')[1])?.title:({curriculum:'Learning path',playground:'Try an example',resources:'Books & resources',home:'Learn by doing'})[hash];
+  if(hash.startsWith('lesson/'))lesson(hash.split('/')[1]);else if(hash==='mcq')mcqPractice();else if(hash==='playground')playground();else if(hash==='resources')resources();else curriculum();
+  const title=hash.startsWith('lesson/')?COURSE.find(m=>m.id===hash.split('/')[1])?.title:({curriculum:'Learning path',mcq:'MCQ Practice',playground:'Try an example',resources:'Books & resources'})[hash];
   document.title=(title||'Learn by doing')+' · Python Everyday';
   updateProgress();window.scrollTo(0,0);
 }
