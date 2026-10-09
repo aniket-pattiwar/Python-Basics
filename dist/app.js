@@ -190,12 +190,60 @@ function mcqPractice(){
   jumpSelect.addEventListener('change',()=>{mcqView.position=Number(jumpSelect.value);renderQuestion(true);});
   updateSet();
 }
+let codingStorageAvailable=true;
+const codingCompleted=new Set();
+try{
+  const saved=JSON.parse(localStorage.getItem('python-everyday-coding-v1')||'[]');
+  if(Array.isArray(saved))saved.filter(id=>CODING_BANK.some(q=>q.id===id)).forEach(id=>codingCompleted.add(id));
+}catch{codingStorageAvailable=false;}
+const codingView={topic:'All topics',level:'All levels',term:''};
+function codingPractice(){
+  const topics=['All topics',...new Set(CODING_BANK.map(q=>q.topic))];
+  main.innerHTML=`<div class="page-intro"><div class="eyebrow">SMALL PROBLEMS. REAL PYTHON.</div><h1>21 coding challenges</h1><p>5 each for NumPy, Pandas and Matplotlib, plus 3 NumPy + Pandas and 3 using all three libraries. Start easy, work up to medium, and turn familiar data into useful results.</p></div><details class="coding-setup"><summary>How to practice in your Python editor</summary><ol><li>Use Python 3 and install the libraries once: <code>python -m pip install numpy pandas matplotlib</code>.</li><li>Copy the starter code into a new file, add your solution, and run it in your Python editor or notebook.</li><li>Compare your result with the expected output. For plotting exercises, open the saved SVG file.</li><li>Use a hint if needed, then reveal the solution after your attempt.</li></ol><p>These exercises run in your Python environment. Marking one practiced is your own checklist, not an automatic code grade.</p></details><div class="coding-filters" role="group" aria-label="Filter coding topics">${topics.map(topic=>`<button class="filter ${topic===codingView.topic?'active':''}" data-coding-topic="${escapeHTML(topic)}" aria-pressed="${topic===codingView.topic}">${escapeHTML(topic)}</button>`).join('')}</div><div class="coding-tools"><label for="coding-level">Difficulty</label><select id="coding-level">${['All levels','Easy','Medium'].map(level=>`<option ${level===codingView.level?'selected':''}>${level}</option>`).join('')}</select><input class="search" id="coding-search" type="search" aria-label="Search coding challenges" placeholder="Search, e.g. missing values, sales, charts…" value="${escapeHTML(codingView.term)}"></div><p class="catalog-note" id="coding-count" role="status"></p><div class="coding-list" id="coding-list"></div><p class="continue-note" id="coding-storage"></p><p class="coding-docs">Keep the official guides nearby: <a href="https://numpy.org/doc/stable/user/absolute_beginners.html" target="_blank" rel="noopener">NumPy ↗</a> · <a href="https://pandas.pydata.org/docs/getting_started/intro_tutorials/index.html" target="_blank" rel="noopener">Pandas ↗</a> · <a href="https://matplotlib.org/stable/users/explain/quick_start.html" target="_blank" rel="noopener">Matplotlib ↗</a></p>`;
+  function updateCount(found){
+    document.getElementById('coding-count').textContent=`${found.length} ${found.length===1?'challenge':'challenges'} found · ${codingCompleted.size} / ${CODING_BANK.length} practiced overall`;
+    document.getElementById('coding-storage').textContent=codingStorageAvailable?'Your practice checklist stays on this browser. You can unmark any exercise to revisit it.':'Browser storage is unavailable. Your checklist lasts for this visit.';
+  }
+  function codeBlock(q,part,label){
+    return `<div class="code-card coding-code"><div class="code-label"><span>${label}</span><button class="copy" data-coding-copy="${q.id}" data-part="${part}" aria-label="Copy ${part} for ${escapeHTML(q.title)}">Copy code</button></div><pre><code>${escapeHTML(q[part])}</code></pre></div>`;
+  }
+  function filter(){
+    const term=codingView.term.trim().toLowerCase();
+    const found=CODING_BANK.filter(q=>(codingView.topic==='All topics'||q.topic===codingView.topic)&&(codingView.level==='All levels'||q.level===codingView.level)&&[q.title,q.prompt,q.topic,q.hint].join(' ').toLowerCase().includes(term));
+    updateCount(found);
+    document.getElementById('coding-list').innerHTML=found.map(q=>`<details class="coding-exercise"><summary><span class="coding-number" aria-hidden="true">${moduleNumber(CODING_BANK.indexOf(q))}</span><span class="coding-summary"><strong>${escapeHTML(q.title)}</strong><small>${escapeHTML(q.topic)} · ${q.level}</small></span><span class="coding-status" data-coding-status="${q.id}">${codingCompleted.has(q.id)?'✓ Practiced':'Open challenge'}</span></summary><div class="coding-body"><h2>Your task</h2><p>${escapeHTML(q.prompt)}</p><h3>Sample data & starter code</h3>${codeBlock(q,'starter','PYTHON 3 · START HERE')}<h3>Expected result</h3><pre class="coding-output">${escapeHTML(q.output)}</pre>${q.chart?`<p class="legend-note">${escapeHTML(q.chart.description)}</p><img class="coding-chart" src="assets/coding-${q.id}.svg" alt="${escapeHTML(q.chart.description)}" width="600" height="350" loading="lazy" decoding="async">`:''}<details class="hint coding-hint"><summary>Show a hint</summary><p>${escapeHTML(q.hint)}</p></details><details class="coding-solution"><summary>Reveal solution after your attempt</summary>${codeBlock(q,'solution','PYTHON 3 · ONE POSSIBLE SOLUTION')}</details><button class="button secondary coding-complete" data-coding-complete="${q.id}" aria-pressed="${codingCompleted.has(q.id)}">${codingCompleted.has(q.id)?'✓ Practiced · undo':'Mark as practiced ✓'}</button></div></details>`).join('')||'<div class="empty"><h3>No matching challenges</h3><p>Choose All topics and All levels, or try a different search word.</p></div>';
+    document.querySelectorAll('[data-coding-copy]').forEach(button=>button.addEventListener('click',async()=>{
+      const q=CODING_BANK.find(item=>item.id===button.dataset.codingCopy);
+      try{await navigator.clipboard.writeText(q[button.dataset.part]);notify('Code copied. Paste it into your Python editor.');}
+      catch{notify('Copy unavailable here. Select the code and copy it manually.');}
+    }));
+    document.querySelectorAll('[data-coding-complete]').forEach(button=>button.addEventListener('click',()=>{
+      const id=button.dataset.codingComplete;
+      if(codingCompleted.has(id))codingCompleted.delete(id);else codingCompleted.add(id);
+      try{localStorage.setItem('python-everyday-coding-v1',JSON.stringify([...codingCompleted]));}
+      catch{codingStorageAvailable=false;}
+      const done=codingCompleted.has(id);
+      button.textContent=done?'✓ Practiced · undo':'Mark as practiced ✓';
+      button.setAttribute('aria-pressed',String(done));
+      document.querySelector(`[data-coding-status="${id}"]`).textContent=done?'✓ Practiced':'Open challenge';
+      updateCount(found);
+    }));
+  }
+  document.querySelectorAll('[data-coding-topic]').forEach(button=>button.addEventListener('click',()=>{
+    codingView.topic=button.dataset.codingTopic;
+    document.querySelectorAll('[data-coding-topic]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});
+    filter();
+  }));
+  document.getElementById('coding-level').addEventListener('change',event=>{codingView.level=event.target.value;filter();});
+  document.getElementById('coding-search').addEventListener('input',event=>{codingView.term=event.target.value;filter();});
+  filter();
+}
 function route(){
   const requested=location.hash.slice(1);
-  const hash=requested.startsWith('lesson/')||['curriculum','mcq','playground','resources'].includes(requested)?requested:'curriculum';
+  const hash=requested.startsWith('lesson/')||['curriculum','mcq','coding','playground','resources'].includes(requested)?requested:'curriculum';
   document.querySelectorAll('[data-nav]').forEach(a=>{const active=hash===a.dataset.nav||(hash.startsWith('lesson/')&&a.dataset.nav==='curriculum');a.classList.toggle('active',active);if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
-  if(hash.startsWith('lesson/'))lesson(hash.split('/')[1]);else if(hash==='mcq')mcqPractice();else if(hash==='playground')playground();else if(hash==='resources')resources();else curriculum();
-  const title=hash.startsWith('lesson/')?COURSE.find(m=>m.id===hash.split('/')[1])?.title:({curriculum:'Learning path',mcq:'MCQ Practice',playground:'Try an example',resources:'Books & resources'})[hash];
+  if(hash.startsWith('lesson/'))lesson(hash.split('/')[1]);else if(hash==='mcq')mcqPractice();else if(hash==='coding')codingPractice();else if(hash==='playground')playground();else if(hash==='resources')resources();else curriculum();
+  const title=hash.startsWith('lesson/')?COURSE.find(m=>m.id===hash.split('/')[1])?.title:({curriculum:'Learning path',mcq:'MCQ Practice',coding:'Coding Practice',playground:'Try an example',resources:'Books & resources'})[hash];
   document.title=(title||'Learn by doing')+' · Python Everyday';
   updateProgress();window.scrollTo(0,0);
 }

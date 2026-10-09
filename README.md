@@ -12,6 +12,10 @@ The site opens on its illustrated learning path with 14 modules, 28 explained ex
 
 The MCQ Practice tab (`#mcq`) contains 100 unique four-option questions: 50 across all 14 syllabus modules, and 50 specialist questions (18 NumPy, 18 Pandas, 14 Matplotlib). Switch question sets, filter by topic, or jump to a question. Checking an answer reveals the correct option and an explanation. Scores and checked answers stay in the current browser; Try again replaces that question's previous result. MCQ content is in `dist/mcq-bank.js`. Run `node check-mcq.mjs` to verify counts, uniqueness, topic coverage, and answer structure.
 
+The Coding Practice tab (`#coding`) has 21 easy-to-medium exercises: 5 each for NumPy, Pandas and Matplotlib, 3 combining NumPy + Pandas, and 3 combining all three libraries. Each includes a task, sample data, copyable starter code, expected output, a hint and a standalone solution. Eight reference charts show the expected graphical results. Filter by topic or difficulty, search, and keep a browser-local practice checklist. Run your own code in a Python editor or notebook; the site does not execute or automatically grade it. Content is in `dist/coding-bank.js`.
+
+All 21 coding solutions were executed with NumPy 2.3.5, Pandas 3.0.1 and Matplotlib 3.11.2. Their printed output, numerical results, plot data and a constant-feature scaling boundary were checked. To repeat verification, run `node check-coding.mjs`, then `python check-coding.py` in an environment with those libraries. The Python check regenerates the 8 reference SVG charts. Browser checks cover topic and difficulty filters, empty search results, expanding hints and solutions, copying code, checklist persistence and phone layout.
+
 Prepared example results are labeled. The site does not run Python. Run the examples in a Python environment; third-party examples require the indicated packages. Progress is stored in the current browser only and does not sync between devices.
 
 ## Local development
